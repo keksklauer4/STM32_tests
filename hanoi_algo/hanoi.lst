@@ -1,0 +1,228 @@
+ARM GAS  hanoi.asm 			page 1
+
+
+   1              	
+   2              	@directives
+   3              	    .thumb
+   4              	    .syntax unified
+   5              	
+   6              	@ each tower has a size of HANOI_HEIGHT
+   7              	@ first byte of each tower holds the amount of values on that tower
+   8              	
+   9              	@equates
+  10              	    .equ    HANOI_HEIGHT,       0x15
+  11              	    .equ    SRAM,               0x20000000
+  12              	    .equ    T0,                 0x20000010
+  13              	    .equ    T1,                 0x20000060
+  14              	    .equ    T2,                 0x200000B0
+  15              	
+  16              	    .equ STACKINIT,             0x20005000
+  17              	
+  18              	    .equ    CLOCK_EN_REG2,       0x40021018 @ RCC_APB2ENR (peripheral clock enable register 2)
+  19              	    .equ    GPIOC_CRH,          0x40011004
+  20              	    .equ    GPIOC_ODR,          0x4001100C
+  21              	
+  22              	
+  23              	@ Vectors (taken from somewhere else)
+  24              	vectors:
+  25 0000 00500020 	        .word STACKINIT         @ stack pointer value when stack is empty
+  26 0004 1D000000 	        .word _start + 1        @ reset vector (manually adjust to odd for thumb)
+  27 0008 E7000000 	        .word _nmi_handler + 1  @
+  28 000c E7000000 	        .word _hard_fault  + 1  @
+  29 0010 E7000000 	        .word _memory_fault + 1 @
+  30 0014 E7000000 	        .word _bus_fault + 1    @
+  31 0018 E7000000 	        .word _usage_fault + 1  @
+  32              	
+  33              	
+  34              	@ -------------------------------------------------------------------------------------------------
+  35              	_start:     
+  36 001c 00F056F8 	            BL f_turn_on_led
+  37              	
+  38 0020 00F00AF8 	            BL f_initialize_memory
+  39 0024 00F012F8 	            BL f_create_tower
+  40              	
+  41              	            @ prepare registers for Hanoi
+  42 0028 3148     	            LDR r0, =T0
+  43 002a 3249     	            LDR r1, =T1
+  44 002c 324A     	            LDR r2, =T2
+  45 002e 1523     	            LDR r3, =HANOI_HEIGHT
+  46              	
+  47 0030 00F015F8 	            BL f_hanoi_algo
+  48 0034 00F057F8 	            BL _usage_fault
+  49              	
+  50              	
+  51              	@ -------------------------------------------------------------------------------------------------
+  52              	f_initialize_memory:
+  53 0038 4FF00050 	            LDR r0, =SRAM
+  54 003c 0021     	            LDR r1, =#0x00
+  55 003e 2F4A     	            LDR r2, =#0x200000FF
+  56              	
+  57              	l_initilization_loop:
+ARM GAS  hanoi.asm 			page 2
+
+
+  58 0040 0160     	            STR r1, [r0]
+  59 0042 00F10100 	            ADD r0, #0x01    @ increment pointer to SRAM location
+  60 0046 9042     	            CMP r0, r2
+  61 0048 FAD1     	            BNE l_initilization_loop
+  62              	
+  63              	            @ endloop
+  64 004a 7047     	            BX lr
+  65              	@ -------------------------------------------------------------------------------------------------
+  66              	
+  67              	f_create_tower:
+  68              	            @ Tower is created in T0
+  69 004c 2848     	            LDR r0, =T0
+  70 004e 1521     	            LDR r1, =HANOI_HEIGHT
+  71              	
+  72              	l_tower_filling_loop:
+  73 0050 0160     	            STR r1, [r0]
+  74 0052 0139     	            SUBS r1, #0x01
+  75 0054 00F10100 	            ADD r0, #0x01
+  76 0058 0029     	            CMP r1, #0x00
+  77 005a F9D1     	            BNE l_tower_filling_loop @ stop at the top of the tower
+  78              	
+  79              	            @ endloop
+  80 005c 7047     	            BX lr
+  81              	
+  82              	@ -------------------------------------------------------------------------------------------------
+  83              	f_hanoi_algo:
+  84              	            @ if n = 1 jump to move upper plate
+  85 005e 012B     	            CMP r3, #0x01
+  86 0060 19D0     	            BEQ f_move_upper_plate @ will ret from current function
+  87              	
+  88              	            @ general case
+  89              	            @ swap destination location and temp location
+  90 0062 9046     	            MOV r8, r2              @ register 8 will only be used for this purpopse
+  91 0064 0A46     	            MOV r2, r1
+  92 0066 4146     	            MOV r1, r8
+  93              	
+  94              	            @ call f_hanoi_algo for n-1 to move upper (n-1) plates to temporary location
+  95 0068 A3F10103 	            SUB r3, 0x01        @ n = n - 1
+  96 006c 00B5     	            PUSH {lr}           @ save Link Register for return
+  97 006e FFF7F6FF 	            BL f_hanoi_algo
+  98              	
+  99              	            @ now move plate with value n
+ 100 0072 9046     	            MOV r8, r2
+ 101 0074 0A46     	            MOV r2, r1
+ 102 0076 4146     	            MOV r1, r8
+ 103              	
+ 104 0078 00F00DF8 	            BL f_move_upper_plate
+ 105              	
+ 106              	
+ 107              	            @ now move (n-1) plates from temporary location onto destination location
+ 108 007c 8046     	            MOV r8, r0
+ 109 007e 0846     	            MOV r0, r1
+ 110 0080 4146     	            MOV r1, r8
+ 111              	
+ 112 0082 FFF7ECFF 	            BL f_hanoi_algo
+ 113              	
+ 114 0086 8046     	            MOV r8, r0
+ARM GAS  hanoi.asm 			page 3
+
+
+ 115 0088 0846     	            MOV r0, r1
+ 116 008a 4146     	            MOV r1, r8
+ 117 008c 03F10103 	            ADD r3, #0x01
+ 118              	
+ 119 0090 5DF804EB 	            POP {lr}
+ 120 0094 7047     	            BX lr
+ 121              	
+ 122              	@ -------------------------------------------------------------------------------------------------
+ 123              	f_move_upper_plate:
+ 124              	            @ r0 from tower
+ 125              	            @ r2 to tower
+ 126 0096 35B4     	            PUSH {r0, r2, r4, r5}
+ 127 0098 0468     	            LDR r4, [r0] @ obtain amount of values on "from" tower
+ 128 009a 04F0FF04 	            AND r4, r4, #0xFF
+ 129 009e 2044     	            ADD r0, r4    @ set pointer to value to be copied
+ 130 00a0 0468     	            LDR r4, [r0]
+ 131              	
+ 132              	            @ TODO: not needed
+ 133 00a2 0025     	            LDR r5, =#0x00
+ 134 00a4 0560     	            STR r5, [r0]
+ 135              	            @@@
+ 136              	
+ 137 00a6 1568     	            LDR r5, [r2] @ obtain amount of values on "to" tower
+ 138 00a8 05F0FF05 	            AND r5, r5, #0xFF
+ 139 00ac 2A44     	            ADD r2, r5
+ 140 00ae 02F10102 	            ADD r2, #0x01
+ 141 00b2 1460     	            STR r4, [r2]
+ 142              	
+ 143 00b4 35BC     	            POP {r0, r2, r4, r5}
+ 144 00b6 20B4     	            PUSH {r5}
+ 145 00b8 0568     	            LDR r5, [r0]
+ 146 00ba A5F10105 	            SUB r5, #0x01
+ 147 00be 0560     	            STR r5, [r0]
+ 148 00c0 1568     	            LDR r5, [r2]
+ 149 00c2 05F10105 	            ADD r5, #0x01
+ 150 00c6 1560     	            STR r5, [r2] 
+ 151 00c8 20BC     	            POP {r5}
+ 152 00ca 7047     	            BX lr
+ 153              	
+ 154              	@ -------------------------------------------------------------------------------------------------
+ 155              	f_turn_on_led:
+ 156 00cc 0C49     	            LDR r1, =CLOCK_EN_REG2 @enable clock for io ports
+ 157 00ce 0868     	            LDR r0, [r1]
+ 158 00d0 40F4FE70 	            ORR r0, r0, 0x1fc
+ 159 00d4 0860     	            STR r0, [r1]
+ 160              	
+ 161 00d6 0B49     	            LDR   r1, =GPIOC_CRH      @ Address for port c control register
+ 162 00d8 0868     	            LDR   r0, [r1]
+ 163 00da 0860     	            STR   r0, [r1]            @ Write to contorl register
+ 164              	
+ 165 00dc 0A49     	            LDR   r1, =GPIOC_ODR      @ Address for port c output data register
+ 166 00de 4FF42060 	            MOV     r0, #0x0A00         @ Value for port c
+ 167 00e2 0860     	            STR     r0, [r1]            @ Write value
+ 168 00e4 7047     	            BX lr
+ 169              	@ -------------------------------------------------------------------------------------------------
+ 170              	
+ 171              	_dummy:                        @ if any int gets triggered, just hang in a loop
+ARM GAS  hanoi.asm 			page 4
+
+
+ 172              	_nmi_handler:
+ 173              	_hard_fault:
+ 174              	_memory_fault:
+ 175              	_bus_fault:
+ 176              	_usage_fault:
+ 177 00e6 00F10100 	        add r0, 1
+ 178 00ea 01F10101 	        add r1, 1
+ 179 00ee FAE71000 	        b _dummy
+ 179      00206000 
+ 179      0020B000 
+ 179      0020FF00 
+ 179      00201810 
+ARM GAS  hanoi.asm 			page 5
+
+
+DEFINED SYMBOLS
+           hanoi.asm:10     *ABS*:0000000000000015 HANOI_HEIGHT
+           hanoi.asm:11     *ABS*:0000000020000000 SRAM
+           hanoi.asm:12     *ABS*:0000000020000010 T0
+           hanoi.asm:13     *ABS*:0000000020000060 T1
+           hanoi.asm:14     *ABS*:00000000200000b0 T2
+           hanoi.asm:16     *ABS*:0000000020005000 STACKINIT
+           hanoi.asm:18     *ABS*:0000000040021018 CLOCK_EN_REG2
+           hanoi.asm:19     *ABS*:0000000040011004 GPIOC_CRH
+           hanoi.asm:20     *ABS*:000000004001100c GPIOC_ODR
+           hanoi.asm:24     .text:0000000000000000 vectors
+           hanoi.asm:35     .text:000000000000001c _start
+           hanoi.asm:172    .text:00000000000000e6 _nmi_handler
+           hanoi.asm:173    .text:00000000000000e6 _hard_fault
+           hanoi.asm:174    .text:00000000000000e6 _memory_fault
+           hanoi.asm:175    .text:00000000000000e6 _bus_fault
+           hanoi.asm:176    .text:00000000000000e6 _usage_fault
+           hanoi.asm:155    .text:00000000000000cc f_turn_on_led
+                            .text:0000000000000000 $d
+           hanoi.asm:36     .text:000000000000001c $t
+           hanoi.asm:52     .text:0000000000000038 f_initialize_memory
+           hanoi.asm:67     .text:000000000000004c f_create_tower
+           hanoi.asm:83     .text:000000000000005e f_hanoi_algo
+           hanoi.asm:57     .text:0000000000000040 l_initilization_loop
+           hanoi.asm:72     .text:0000000000000050 l_tower_filling_loop
+           hanoi.asm:123    .text:0000000000000096 f_move_upper_plate
+           hanoi.asm:171    .text:00000000000000e6 _dummy
+           hanoi.asm:179    .text:00000000000000f0 $d
+
+NO UNDEFINED SYMBOLS

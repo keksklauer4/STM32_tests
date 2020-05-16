@@ -1,0 +1,212 @@
+ARM GAS  binary_search.asm 			page 1
+
+
+   1              	@directives
+   2              	    .thumb
+   3              	    .syntax unified
+   4              	
+   5              	@ create list, use dma and interrupts to copy somewhere else, then do binary search
+   6              	
+   7              	@equates
+   8              	    .equ    SIZE,               0xFF
+   9              	    .equ    SRAM,               0x20000000
+  10              	    .equ    L0,                 0x20000000
+  11              	    .equ    L1,                 0x20000200
+  12              	    .equ    SEARCH,             0x68
+  13              	
+  14              	    .equ    DMA_CALLBACK_PTR,    0x20001000
+  15              	
+  16              	    .equ    STACKINIT,          0x20005000
+  17              	
+  18              	    .equ    CLOCK_EN_REG,      0x40021014 @ RCC_AHBENR (peripheral clock enable register)
+  19              	    .equ    GPIOC_CRH,          0x40011004
+  20              	    .equ    GPIOC_ODR,          0x4001100C
+  21              	    .equ    DMA_CPAR1,          0x40020010  @ source address
+  22              	    .equ    DMA_CMAR1,          0x40020014  @ destination address
+  23              	    .equ    DMA_CNDTR1,         0x4002000C  @ copy size
+  24              	    .equ    DMA_CCR1,            0x40020008  @ dma configuration register
+  25              	
+  26              	
+  27              	    .equ    DMA_CONFIG_FLAGS,    0b111101011010010 @configuration of dma channel
+  28              	
+  29              	
+  30              	
+  31              	@ Vectors (taken from somewhere else)
+  32              	vectors:
+  33 0000 00500020 	        .word STACKINIT         @ stack pointer value when stack is empty
+  34 0004 1D000000 	        .word _start + 1        @ reset vector (manually adjust to odd for thumb)
+  35 0008 C5000000 	        .word _nmi_handler + 1  @
+  36 000c C5000000 	        .word _hard_fault  + 1  @
+  37 0010 C5000000 	        .word _memory_fault + 1 @
+  38 0014 C5000000 	        .word _bus_fault + 1    @
+  39 0018 C5000000 	        .word _usage_fault + 1  @
+  40              	
+  41              	
+  42              	@ -------------------------------------------------------------------------------------------------
+  43              	_start:
+  44 001c 4FF00050 	            LDR r0, =L0
+  45 0020 FF21     	            LDR r1, =SIZE
+  46 0022 82EA0202 	            EOR r2, r2
+  47 0026 00F004F8 	            BL f_create_list
+  48 002a 00F043F8 	            BL f_dma_callback
+  49 002e 00F021F8 	            BL f_invoke_dma_handler
+  50              	
+  51              	@ -------------------------------------------------------------------------------------------------
+  52              	f_create_list:
+  53 0032 C0F80010 	            STR.W r1, [r0]
+  54 0036 00F10400 	            ADD r0, #0x04
+  55              	
+  56              	l_list_creation_loop:
+  57 003a C0F80020 	            STR.W r2, [r0]
+ARM GAS  binary_search.asm 			page 2
+
+
+  58 003e 00F10400 	            ADD r0, #0x04
+  59 0042 02F10402 	            ADD r2, #0x04
+  60 0046 B2EB810F 	            CMP r2, r1, LSL 0x02
+  61 004a F6D1     	            BNE l_list_creation_loop
+  62              	
+  63 004c 7047     	            BX lr
+  64              	
+  65              	@ -------------------------------------------------------------------------------------------------
+  66              	f_binary_search:
+  67              	            @ r0 : lower end
+  68              	            @ r1 : upper end
+  69              	            @ r2 : value to be searched for
+  70              	            @ r3 : pointer to base of list
+  71              	
+  72              	            @ get element at middle
+  73 004e 0446     	            MOV r4, r0
+  74 0050 0C44     	            ADD r4, r1
+  75 0052 4FEA5404 	            LSR r4, #0x01
+  76 0056 03EB8406 	            ADD r6, r3, r4, LSL #0x02
+  77              	
+  78 005a 3568     	            LDR r5, [r6]
+  79 005c 9542     	            CMP r5, r2
+  80 005e 04D0     	            BEQ l_value_found
+  81 0060 04D2     	            BCS l_lower_bound
+  82              	            @ fallthrough: Carry Clear (upper bound)
+  83 0062 04F10104 	            ADD r4, #0x01
+  84 0066 2046     	            MOV r0, r4
+  85 0068 F1E7     	            B f_binary_search
+  86              	l_value_found:
+  87 006a 7047     	            BX lr       @ return to saved program counter
+  88              	l_lower_bound:
+  89 006c A4F10104 	            SUB r4, #0x01
+  90 0070 2146     	            MOV r1, r4
+  91 0072 ECE7     	            B f_binary_search
+  92              	
+  93              	@ -------------------------------------------------------------------------------------------------
+  94              	f_invoke_dma_handler:
+  95              	            @ enable DMA1 clock
+  96              	            @ LDR r1, =CLOCK_EN_REG
+  97              	            @ LDR r0, [r1]
+  98              	            @ ORR r0, #0x01
+  99              	            @ STR.W r0, [r1]
+ 100              	
+ 101              	            @ set source address
+ 102 0074 4FF00050 	            LDR r0, =L0
+ 103 0078 1549     	            LDR r1, =DMA_CPAR1
+ 104 007a C1F80000 	            STR.W r0, [r1]
+ 105              	
+ 106              	            @ set destination address
+ 107 007e 1548     	            LDR r0, =L1
+ 108 0080 01F10401 	            ADD r1, #0x04
+ 109 0084 C1F80000 	            STR.W r0, [r1]
+ 110              	
+ 111              	            @ set size
+ 112 0088 FF20     	            LDR r0, =SIZE
+ 113 008a 1349     	            LDR r1, =DMA_CNDTR1
+ 114 008c C1F80000 	            STR.W r0, [r1]
+ARM GAS  binary_search.asm 			page 3
+
+
+ 115              	
+ 116              	            @ set configuration of channel
+ 117 0090 47F6D220 	            LDR r0, =DMA_CONFIG_FLAGS
+ 118 0094 1149     	            LDR r1, =DMA_CCR1
+ 119 0096 C1F80000 	            STR.W r0, [r1]
+ 120              	
+ 121              	            @ set callback
+ 122 009a 1148     	            LDR r0, =f_dma_callback
+ 123 009c 1149     	            LDR r1, =DMA_CALLBACK_PTR
+ 124 009e C1F80000 	            STR.W r0, [r1]
+ 125              	
+ 126              	
+ 127              	            @ enable dma channel
+ 128 00a2 47F6D220 	            LDR r0, =DMA_CONFIG_FLAGS
+ 129 00a6 0168     	            LDR r1, [r0]
+ 130 00a8 41F00101 	            ORR r1, #0x01
+ 131 00ac C0F80010 	            STR.W r1, [r0]
+ 132              	
+ 133              	            @ enable interrupts and wait for int
+ 134 00b0 62B6     	            CPSIE i
+ 135 00b2 30BF     	            WFI
+ 136              	
+ 137              	
+ 138              	@ -------------------------------------------------------------------------------------------------
+ 139              	f_dma_callback:
+ 140              	            @ call binary search
+ 141 00b4 0420     	            LDR r0, =#0x04
+ 142 00b6 4FF00053 	            LDR r3, =L0 @ TODO: actually L1 instead of L0
+ 143 00ba 1968     	            LDR r1, [r3]
+ 144 00bc 01F10401 	            ADD r1, #0x04
+ 145              	
+ 146 00c0 6822     	            LDR r2, =SEARCH
+ 147              	
+ 148 00c2 C4E7     	            B f_binary_search
+ 149              	
+ 150              	@ -------------------------------------------------------------------------------------------------
+ 151              	_dummy:
+ 152              	_nmi_handler:
+ 153              	_hard_fault:
+ 154              	_memory_fault:
+ 155              	_bus_fault:
+ 156              	_usage_fault:
+ 157 00c4 F6E7     	        B f_dma_callback
+ 158 00c6 00F10100 	        add r0, 1
+ 159 00ca 01F10101 	        add r1, 1
+ 160 00ce F9E71000 	        b _dummy...
+ 160      02400002 
+ 160      00200C00 
+ 160      02400800 
+ 160      0240B400 
+ARM GAS  binary_search.asm 			page 4
+
+
+DEFINED SYMBOLS
+   binary_search.asm:8      *ABS*:00000000000000ff SIZE
+   binary_search.asm:9      *ABS*:0000000020000000 SRAM
+   binary_search.asm:10     *ABS*:0000000020000000 L0
+   binary_search.asm:11     *ABS*:0000000020000200 L1
+   binary_search.asm:12     *ABS*:0000000000000068 SEARCH
+   binary_search.asm:14     *ABS*:0000000020001000 DMA_CALLBACK_PTR
+   binary_search.asm:16     *ABS*:0000000020005000 STACKINIT
+   binary_search.asm:18     *ABS*:0000000040021014 CLOCK_EN_REG
+   binary_search.asm:19     *ABS*:0000000040011004 GPIOC_CRH
+   binary_search.asm:20     *ABS*:000000004001100c GPIOC_ODR
+   binary_search.asm:21     *ABS*:0000000040020010 DMA_CPAR1
+   binary_search.asm:22     *ABS*:0000000040020014 DMA_CMAR1
+   binary_search.asm:23     *ABS*:000000004002000c DMA_CNDTR1
+   binary_search.asm:24     *ABS*:0000000040020008 DMA_CCR1
+   binary_search.asm:27     *ABS*:0000000000007ad2 DMA_CONFIG_FLAGS
+   binary_search.asm:32     .text:0000000000000000 vectors
+   binary_search.asm:43     .text:000000000000001c _start
+   binary_search.asm:152    .text:00000000000000c4 _nmi_handler
+   binary_search.asm:153    .text:00000000000000c4 _hard_fault
+   binary_search.asm:154    .text:00000000000000c4 _memory_fault
+   binary_search.asm:155    .text:00000000000000c4 _bus_fault
+   binary_search.asm:156    .text:00000000000000c4 _usage_fault
+                            .text:0000000000000000 $d
+   binary_search.asm:44     .text:000000000000001c $t
+   binary_search.asm:52     .text:0000000000000032 f_create_list
+   binary_search.asm:139    .text:00000000000000b4 f_dma_callback
+   binary_search.asm:94     .text:0000000000000074 f_invoke_dma_handler
+   binary_search.asm:56     .text:000000000000003a l_list_creation_loop
+   binary_search.asm:66     .text:000000000000004e f_binary_search
+   binary_search.asm:86     .text:000000000000006a l_value_found
+   binary_search.asm:88     .text:000000000000006c l_lower_bound
+   binary_search.asm:151    .text:00000000000000c4 _dummy
+   binary_search.asm:160    .text:00000000000000d0 $d
+
+NO UNDEFINED SYMBOLS
