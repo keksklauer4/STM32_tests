@@ -3,10 +3,9 @@
     .syntax unified
 
 @equates
-    .equ    HASH_ALGO,       0x15
-    .equ    RANDOM_ALGO,     0x10
-    .equ    TABLE_SIZE,      0x200
-    .equ    TABLE_PTR,       0x20000000
+    .equ    TABLE_SIZE,      200
+    .equ    TABLE_PTR,       0x20001500
+    .equ    ARRAY_PTR,       0x20000000
     .equ    STACKINIT,       0x20005000
 
 
@@ -40,16 +39,30 @@ _start:
 
         BL f_full_init_table
 
-        LDR r2, =#0x12345678
-        LDR r3, =#0x87654321
-        BL f_table_set
+        LDR r8, =ARRAY_PTR
 
-        EOR r3, r3
-        BL f_table_get
+
+        LDR r4, =100
+        BL f_test_suite
 
         EOR r0, r0
 
+        @ the following is for debugging purposes
+        @LDR r2, =100
+        @LDR r3, =555
+        @BL f_table_set
+        @LDR r2, =300
+        @LDR r3, =666
+        @BL f_table_set
+        @LDR r2, =500
+        @LDR r3, =777
+        @BL f_table_set
+        @LDR r2, =700
+        @LDR r3, =888
+        @BL f_table_set
 
+        @EOR r3, r3
+        @BL f_table_get
 
 
 @ r0: size of table, r1: ptr to start of table, r2: key, r3: value
@@ -61,46 +74,87 @@ _start:
 @f_table_get:
 
 
+@ r0: size of table, r1: ptr to start of table
+@ return: r5: amount of elements
+@f_table_amount_elements:
+
+
+
+@ r0: size of table, r1: pointer to table, r4: amount of elements, r8: array ptr
+@ r5: amount of collisions
+f_test_suite:
+        PUSH {r2, r3, r4, r6, r9, r10, r11, lr}
+        BL f_full_init_table
+
+        MOV r12, r4
+        MOV r9, r8
+        MOV r5, r4
+        LDR r11, =314159265
+
+l_element_fill_loop:
+        MOV r3, r11
+        BL f_randint
+        ADD r11, r3, #0x01
+        ROR r11, 3
+        MOV r2, r4
+        MOV r3, r5
+
+        BL f_table_set
+
+        CMP r4, #0x00
+        BEQ l_element_fill_loop
+        STR.W r2, [r9]
+        ADD r9, #0x04
+        SUB r5, #0x01
+        CMP r5, #0x00
+        BNE l_element_fill_loop
+
+        @endloop
+
+        BL f_table_amount_elements
+
+        CMP r5, r4
+        BCC l_element_fill_loop
+
+        MOV r9, r8
+        EOR r6, r6
+        MOV r11, r4
+
+l_element_get_loop:
+        LDR r2, [r9]
+        ADD r9, #0x04
+        BL f_table_get
+        @ CBZ r4, l_error_occured
+
+        ADD r6, r5
+        SUB r12, #0x01
+        CMP r12, #0x00
+        BNE l_element_get_loop
+
+        @endloop
+
+        MOV r5, r6
+        POP {r2, r3, r4, r6, r9, r10, r11, lr}
+
+        BX lr
+
+
+
+
+l_error_occured:
+        ADD r0, #0x01
+        B l_error_occured
+
+
+
 @ calculate the maximum amount of iterations for given size
 @ r0: size of table, r1: ptr to start of table
 f_full_init_table:
-        PUSH {r3, r4, r5, r6, r9, r10, r11, lr}
-
-        @ free enough space for temporary bitset
-        LSR r2, r0, #0x05
-        ADD r2, #0x01
-        BL f_clear_words
-
-
-        EOR r2, r2
-        MOV r4, r1
-        MOV r10, r0
-
-l_square_loop:
-        ADD r2, #0x01
-        MUL r9, r2, r2
-        BL f_modulo
-        MOV r5, r11
-        BL f_getbit
-        CBNZ r6, l_found_bit_set
-        MOV r3, r5
-        BL f_setbit
-
-        SUB r10, #0x01
-        CMP r10, #0x00
-        BNE l_square_loop
-
-
-
-        @ endloop
-l_found_bit_set:
-        SUB r2, #0x01
-        POP {r3, r4, r5, r6, r9, r10, r11, lr}
-
+        MOV r2, r0, LSR 1
 
 @ r0: size of table, r1: ptr to start of table, r2: max iterations
 f_init_table:
-        STR r2, [r1]
+        STR.W r2, [r1]
 
         PUSH { r1, lr }
         ADD r1, #0x01
@@ -117,7 +171,7 @@ f_init_table:
 @ return: r3: value, r4: bool that indicates whether found, r5: amount of collisions
 f_table_get:
         @ 1. hash value, 2. check whether bit set, 3a. if not, r4=0, 3b. if yes loop with quadratic probing
-        PUSH {r5, r6, r7, r9, r10, r11, r12, lr}
+        PUSH {r6, r7, r9, r10, r11, r12, lr}
         MOV r9, r2
         MOV r10, r0
         BL f_modulo
@@ -128,6 +182,7 @@ f_table_get:
 
         MOV r5, r11
         BL f_getbit
+        LDR r12, =#0x00
         CBZ r6, l_not_in_table
 
         @ check whether keys are same
@@ -135,6 +190,7 @@ f_table_get:
         ADD r6, #0x01
         LSL r6, #0x02
         ADD r6, r4
+        MOV r7, r6
 
         ADD r9, r6, r5, LSL 3
 
@@ -163,7 +219,7 @@ l_no_mod:
         CBZ r6, l_not_in_table
 
         @ bit is set, check contents
-        ADD r9, r6, r5, LSL 3
+        ADD r9, r7, r5, LSL 3
         LDR r10, [r9]
         CMP r10, r2
         BEQ l_found_with_collisions
@@ -172,7 +228,7 @@ l_no_mod:
         ADD r12, #0x01
         SUB r3, #0x01
         CMP r3, #0x00
-        BEQ l_collision_resolve_loop_get
+        BNE l_collision_resolve_loop_get
 
         @ endloop
         B l_not_in_table
@@ -186,17 +242,18 @@ l_in_table:
         B l_ret_from_get
 
 l_not_in_table:
+        MOV r5, r12
         EOR r4, r4
 
 l_ret_from_get:
-        POP {r5, r6, r9, r10, r11, r12, lr}
+        POP {r6, r7, r9, r10, r11, r12, lr}
         BX lr
 
 
 @ r0: size of table, r1: ptr to start of table, r2: key, r3: value
 @ return: r4: bool that indicates whether able to insert
 f_table_set:
-        PUSH {r5, r6, r7, r8, r9, r10, r11, r12}
+        PUSH {r5, r6, r7, r8, r9, r10, r11, r12, lr}
         MOV r9, r2
         MOV r10, r0
         BL f_modulo
@@ -235,7 +292,10 @@ l_collision_resolve_loop_set:
         MOV r5, r11
 
 l_no_mod_needed:
+        MOV r11, r4
+        ADD r4, r1, #0x04
         BL f_getbit
+        MOV r4, r11
 
         ADD r8, r7, r5, LSL 3
         CBZ r6, l_insert
@@ -250,7 +310,7 @@ l_no_mod_needed:
         ADD r12, #0x01
         SUB r4, #0x01
         CMP r4, #0x00
-        BEQ l_collision_resolve_loop_set
+        BNE l_collision_resolve_loop_set
 
         @ endloop
 
@@ -260,22 +320,21 @@ l_no_mod_needed:
 
 
 l_insert:
+        MOV r12, r3
         MOV r3, r5
         ADD r4, r1, #0x04
         BL f_setbit
 
         STR r2, [r8]
+        MOV r3, r12
 l_insert_content:
         ADD r8, #0x04
-        STR r3, [r8]
+        STR.W r3, [r8]
         LDR r4, =#0x01
 l_ret_from_set:
-        POP {r5, r6, r7, r8, r9, r10, r11, r12}
+        POP {r5, r6, r7, r8, r9, r10, r11, r12, lr}
         BX lr
 
-
-@
-f_table_probe:
 
 @ r0: size of table, r1: ptr to start of table
 f_table_clear:
@@ -311,11 +370,14 @@ l_bit_check_loop:
         LSR r4, 1
         ADD r5, r6
 
-        SUBS r7, #0x01
-        BEQ ret_from_amount_elements
+        SUB r7, #0x01
+        CBZ r7, ret_from_amount_elements
 
         CMP r4, #0x00
-        BNE l_word_check_loop
+        BEQ l_word_check_loop
+
+        B l_bit_check_loop
+
 
 ret_from_amount_elements:
         POP { r3, r4, r6, r7 }
@@ -358,11 +420,11 @@ f_clear_words:
         EOR r6, r6
 
 l_clear_loop:
-        STR r6, [r7]
+        STR.W r6, [r7]
         ADD r7, #0x04
         SUB r2, #0x01
         CMP r2, #0x00
-        BEQ l_clear_loop
+        BNE l_clear_loop
 
         @ endloop
         POP {r6, r7}
@@ -381,7 +443,7 @@ f_setbit:
         MOV r6, r8
         LDR r8, [r5]
         ORR r8, r6
-        STR r8, [r5]
+        STR.W r8, [r5]
 
         POP {r5, r6,r8}
         BX lr
@@ -390,10 +452,11 @@ f_setbit:
 @ r5: index, r4: pointer
 @ return: r6: bool set
 f_getbit:
-        PUSH  {r5, r8}
+        PUSH  {r5, r7, r8}
         MOV r6, r5, LSR 5
+        MOV r7, r5
         ADD r5, r4, r6, LSL 2
-        AND r6, #0x1F
+        AND r6, r7, #0x1F
         LDR r8, [r5]
         LSR r8, r6
         LDR r6, =#0x01
@@ -404,7 +467,7 @@ f_getbit:
         EOR r6, r6
 
 l_not_zero:
-        POP   {r5, r8}
+        POP   {r5, r7, r8}
         BX lr
 
 
@@ -421,7 +484,7 @@ f_clear_bit:
         EOR r6, r8
         LDR r8, [r5]
         AND r8, r6
-        STR r8, [r5]
+        STR.W r8, [r5]
         POP {r5, r6,r8}
 
         BX lr
