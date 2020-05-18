@@ -7,3 +7,9 @@ Note that
 4. you honestly should not use this in a practical application since I only tested in qemu (see https://github.com/beckus/qemu_stm32) and due to limited functionality.
 
 I am not responsible for anything you do with this code. Feel free to change whatever you want.
+
+TODOs:
+- Change data structure to support deletion of elements (and adapt get, set and size function)
+- implement delete function
+- implement to_array function
+- write tests for all functionality
