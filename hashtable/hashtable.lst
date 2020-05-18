@@ -6,7 +6,7 @@ ARM GAS  ./hashtable.asm 			page 1
    3              	    .syntax unified
    4              	
    5              	@equates
-   6              	    .equ    TABLE_SIZE,      200
+   6              	    .equ    TABLE_SIZE,      500
    7              	    .equ    TABLE_PTR,       0x20001500
    8              	    .equ    ARRAY_PTR,       0x20000000
    9              	    .equ    STACKINIT,       0x20005000
@@ -16,11 +16,11 @@ ARM GAS  ./hashtable.asm 			page 1
   13              	vectors:
   14 0000 00500020 	        .word STACKINIT         @ stack pointer value when stack is empty
   15 0004 1D000000 	        .word _start + 1        @ reset vector (manually adjust to odd for thumb)
-  16 0008 07030000 	        .word _nmi_handler + 1  @
-  17 000c 07030000 	        .word _hard_fault  + 1  @
-  18 0010 07030000 	        .word _memory_fault + 1 @
-  19 0014 07030000 	        .word _bus_fault + 1    @
-  20 0018 07030000 	        .word _usage_fault + 1  @
+  16 0008 69030000 	        .word _nmi_handler + 1  @
+  17 000c 69030000 	        .word _hard_fault  + 1  @
+  18 0010 69030000 	        .word _memory_fault + 1 @
+  19 0014 69030000 	        .word _bus_fault + 1    @
+  20 0018 69030000 	        .word _usage_fault + 1  @
   21              	
   22              	@ -------------------------------------------------------------------------------------------------
   23              	@ Hash table with size n
@@ -37,548 +37,590 @@ ARM GAS  ./hashtable.asm 			page 1
   34              	_start:
   35              	        @ initialize HASH_TABLE with given size
   36              	        @ fill HASH_TABLE with random values
-  37 001c C820     	        LDR r0, =TABLE_SIZE
-  38 001e BC49     	        LDR r1, =TABLE_PTR
+  37 001c 4FF4FA70 	        LDR r0, =TABLE_SIZE
+  38 0020 D449     	        LDR r1, =TABLE_PTR
   39              	
-  40 0020 00F040F8 	        BL f_full_init_table
+  40 0022 00F05FF8 	        BL f_full_init_table
   41              	
-  42 0024 4FF00058 	        LDR r8, =ARRAY_PTR
+  42 0026 4FF00058 	        LDR r8, =ARRAY_PTR
   43              	
   44              	
-  45 0028 6424     	        LDR r4, =100
-  46 002a 00F002F8 	        BL f_test_suite
+  45 002a FA24     	        LDR r4, =250
+  46 002c 00F018F8 	        BL f_test_suite
   47              	
-  48 002e 80EA0000 	        EOR r0, r0
-  49              	
-  50              	        @ the following is for debugging purposes
-  51              	        @LDR r2, =100
-  52              	        @LDR r3, =555
-  53              	        @BL f_table_set
-  54              	        @LDR r2, =300
-  55              	        @LDR r3, =666
-  56              	        @BL f_table_set
-  57              	        @LDR r2, =500
+  48 0030 85EA0505 	        EOR r5, r5
+  49 0034 4FF4E174 	        LDR r4, =450
+  50 0038 00F012F8 	        BL f_test_suite
+  51              	
+  52 003c 85EA0505 	        EOR r5, r5
+  53 0040 40F2DB14 	        LDR r4, =475
+  54 0044 00F00CF8 	        BL f_test_suite
+  55              	
+  56 0048 85EA0505 	        EOR r5, r5
+  57 004c 4FF4FA74 	        LDR r4, =500
 ARM GAS  ./hashtable.asm 			page 2
 
 
-  58              	        @LDR r3, =777
-  59              	        @BL f_table_set
-  60              	        @LDR r2, =700
-  61              	        @LDR r3, =888
-  62              	        @BL f_table_set
+  58 0050 00F006F8 	        BL f_test_suite
+  59              	
+  60 0054 85EA0505 	        EOR r5, r5
+  61              	
+  62 0058 00F0F6F8 	        BL f_table_amount_elements
   63              	
-  64              	        @EOR r3, r3
-  65              	        @BL f_table_get
+  64 005c 84EA0404 	        EOR r4, r4
+  65              	
   66              	
-  67              	
-  68              	@ r0: size of table, r1: ptr to start of table, r2: key, r3: value
-  69              	@ return: r4: bool that indicates whether able to insert
-  70              	@f_table_set:
-  71              	
-  72              	@ r0: size of table, r1: ptr to start of table, r2: key
-  73              	@ return: r3: value, r4: bool that indicates whether found, r5: amount of collisions
-  74              	@f_table_get:
-  75              	
-  76              	
-  77              	@ r0: size of table, r1: ptr to start of table
-  78              	@ return: r5: amount of elements
-  79              	@f_table_amount_elements:
+  67              	        @ the following is for debugging purposes
+  68              	        @LDR r2, =100
+  69              	        @LDR r3, =555
+  70              	        @BL f_table_set
+  71              	        @LDR r2, =300
+  72              	        @LDR r3, =666
+  73              	        @BL f_table_set
+  74              	        @LDR r2, =500
+  75              	        @LDR r3, =777
+  76              	        @BL f_table_set
+  77              	        @LDR r2, =700
+  78              	        @LDR r3, =888
+  79              	        @BL f_table_set
   80              	
-  81              	
-  82              	
-  83              	@ r0: size of table, r1: pointer to table, r4: amount of elements, r8: array ptr
-  84              	@ r5: amount of collisions
-  85              	f_test_suite:
-  86 0032 2DE95C4E 	        PUSH {r2, r3, r4, r6, r9, r10, r11, lr}
-  87 0036 00F035F8 	        BL f_full_init_table
+  81              	        @EOR r3, r3
+  82              	        @BL f_table_get
+  83              	
+  84              	
+  85              	@ r0: size of table, r1: ptr to start of table, r2: key, r3: value
+  86              	@ return: r4: bool that indicates whether able to insert
+  87              	@f_table_set:
   88              	
-  89 003a A446     	        MOV r12, r4
-  90 003c C146     	        MOV r9, r8
-  91 003e 2546     	        MOV r5, r4
-  92 0040 DFF8D0B2 	        LDR r11, =314159265
+  89              	@ r0: size of table, r1: ptr to start of table, r2: key
+  90              	@ return: r3: value, r4: bool that indicates whether found, r5: amount of collisions
+  91              	@f_table_get:
+  92              	
   93              	
-  94              	l_element_fill_loop:
-  95 0044 5B46     	        MOV r3, r11
-  96 0046 00F0F4F8 	        BL f_randint
-  97 004a 03F1010B 	        ADD r11, r3, #0x01
-  98 004e 4FEAFB0B 	        ROR r11, 3
-  99 0052 2246     	        MOV r2, r4
- 100 0054 2B46     	        MOV r3, r5
- 101              	
- 102 0056 00F07BF8 	        BL f_table_set
- 103              	
- 104 005a 002C     	        CMP r4, #0x00
- 105 005c F2D0     	        BEQ l_element_fill_loop
- 106 005e C9F80020 	        STR.W r2, [r9]
- 107 0062 09F10409 	        ADD r9, #0x04
- 108 0066 A5F10105 	        SUB r5, #0x01
- 109 006a 002D     	        CMP r5, #0x00
- 110 006c EAD1     	        BNE l_element_fill_loop
- 111              	
- 112              	        @endloop
- 113              	
- 114 006e 00F0C7F8 	        BL f_table_amount_elements
+  94              	@ r0: size of table, r1: ptr to start of table
+  95              	@ return: r5: amount of elements
+  96              	@f_table_amount_elements:
+  97              	
+  98              	
+  99              	
+ 100              	@ r0: size of table, r1: pointer to table, r4: amount of elements, r8: array ptr
+ 101              	@ r5: amount of collisions
+ 102              	f_test_suite:
+ 103 0060 2DE95C4E 	        PUSH {r2, r3, r4, r6, r9, r10, r11, lr}
+ 104 0064 00F03EF8 	        BL f_full_init_table
+ 105              	
+ 106 0068 A446     	        MOV r12, r4
+ 107 006a C146     	        MOV r9, r8
+ 108 006c 2546     	        MOV r5, r4
+ 109 006e DFF808B3 	        LDR r11, =314159265
+ 110              	
+ 111              	l_element_fill_loop:
+ 112 0072 5B46     	        MOV r3, r11
+ 113 0074 00F00EF9 	        BL f_randint
+ 114 0078 4FEA743B 	        MOV r11, r4, ROR 13
 ARM GAS  ./hashtable.asm 			page 3
 
 
- 115              	
- 116 0072 A542     	        CMP r5, r4
- 117 0074 E6D3     	        BCC l_element_fill_loop
- 118              	
- 119 0076 C146     	        MOV r9, r8
- 120 0078 86EA0606 	        EOR r6, r6
- 121 007c A346     	        MOV r11, r4
- 122              	
- 123              	l_element_get_loop:
- 124 007e D9F80020 	        LDR r2, [r9]
- 125 0082 09F10409 	        ADD r9, #0x04
- 126 0086 00F01DF8 	        BL f_table_get
- 127              	        @ CBZ r4, l_error_occured
- 128              	
- 129 008a 2E44     	        ADD r6, r5
- 130 008c ACF1010C 	        SUB r12, #0x01
- 131 0090 BCF1000F 	        CMP r12, #0x00
- 132 0094 F3D1     	        BNE l_element_get_loop
- 133              	
- 134              	        @endloop
- 135              	
- 136 0096 3546     	        MOV r5, r6
- 137 0098 BDE85C4E 	        POP {r2, r3, r4, r6, r9, r10, r11, lr}
- 138              	
- 139 009c 7047     	        BX lr
+ 115 007c 2B46     	        MOV r3, r5
+ 116 007e 2246     	        MOV r2, r4
+ 117              	
+ 118 0080 00F08AF8 	        BL f_table_set
+ 119              	
+ 120 0084 002C     	        CMP r4, #0x00
+ 121 0086 04BF     	        ITT EQ
+ 122 0088 0BF1010B 	        ADDEQ r11, #0x01
+ 123 008c F1E7     	        BEQ l_element_fill_loop
+ 124              	
+ 125 008e C9F80020 	        STR.W r2, [r9]
+ 126 0092 09F10409 	        ADD r9, #0x04
+ 127 0096 A5F10105 	        SUB r5, #0x01
+ 128 009a 002D     	        CMP r5, #0x00
+ 129 009c E9D1     	        BNE l_element_fill_loop
+ 130              	
+ 131              	        @endloop
+ 132              	
+ 133 009e 00F0D3F8 	        BL f_table_amount_elements
+ 134              	
+ 135 00a2 6545     	        CMP r5, r12
+ 136 00a4 3CBF     	        ITT CC
+ 137 00a6 0BF1010B 	        ADDCC r11, #0x01
+ 138 00aa E2E7     	        BCC l_element_fill_loop
+ 139              	
  140              	
- 141              	
- 142              	
- 143              	
- 144              	l_error_occured:
- 145 009e 00F10100 	        ADD r0, #0x01
- 146 00a2 FCE7     	        B l_error_occured
- 147              	
- 148              	
- 149              	
- 150              	@ calculate the maximum amount of iterations for given size
- 151              	@ r0: size of table, r1: ptr to start of table
- 152              	f_full_init_table:
- 153 00a4 4FEA5002 	        MOV r2, r0, LSR 1
+ 141              	l_filled_hash_table:
+ 142 00ac C146     	        MOV r9, r8
+ 143 00ae 86EA0606 	        EOR r6, r6
+ 144 00b2 A346     	        MOV r11, r4
+ 145              	
+ 146              	l_element_get_loop:
+ 147 00b4 D9F80020 	        LDR r2, [r9]
+ 148 00b8 09F10409 	        ADD r9, #0x04
+ 149 00bc 00F022F8 	        BL f_table_get
+ 150 00c0 6CB1     	        CBZ r4, l_error_occured
+ 151              	
+ 152 00c2 9C45     	        CMP r12, r3 @ test whether values are equal
+ 153 00c4 0BD1     	        BNE l_error_occured
  154              	
- 155              	@ r0: size of table, r1: ptr to start of table, r2: max iterations
- 156              	f_init_table:
- 157 00a8 C1F80020 	        STR.W r2, [r1]
- 158              	
- 159 00ac 02B5     	        PUSH { r1, lr }
- 160 00ae 01F10101 	        ADD r1, #0x01
- 161 00b2 4FEA5012 	        LSR r2, r0, #0x05
- 162 00b6 02F10102 	        ADD r2, #0x01
- 163 00ba 00F0CDF8 	        BL f_clear_words
- 164              	
- 165 00be BDE80240 	        POP { r1, lr }
- 166 00c2 7047     	        BX lr
+ 155 00c6 2E44     	        ADD r6, r5
+ 156 00c8 0BF1010B 	        ADD r11, #0x01
+ 157 00cc ACF1010C 	        SUB r12, #0x01
+ 158 00d0 BCF1000F 	        CMP r12, #0x00
+ 159 00d4 EED1     	        BNE l_element_get_loop
+ 160              	
+ 161              	        @endloop
+ 162              	
+ 163 00d6 3546     	        MOV r5, r6
+ 164 00d8 BDE85C4E 	        POP {r2, r3, r4, r6, r9, r10, r11, lr}
+ 165              	
+ 166 00dc 7047     	        BX lr
  167              	
  168              	
- 169              	
- 170              	@ r0: size of table, r1: ptr to start of table, r2: key
- 171              	@ return: r3: value, r4: bool that indicates whether found, r5: amount of collisions
+ 169              	l_error_occured:
+ 170 00de 00F10100 	        ADD r0, #0x01
+ 171 00e2 FCE7     	        B l_error_occured
 ARM GAS  ./hashtable.asm 			page 4
 
 
- 172              	f_table_get:
- 173              	        @ 1. hash value, 2. check whether bit set, 3a. if not, r4=0, 3b. if yes loop with quadratic
- 174 00c4 2DE9C05E 	        PUSH {r6, r7, r9, r10, r11, r12, lr}
- 175 00c8 9146     	        MOV r9, r2
- 176 00ca 8246     	        MOV r10, r0
- 177 00cc 00F0B9F8 	        BL f_modulo
- 178              	
+ 172              	
+ 173              	
+ 174              	
+ 175              	@ calculate the maximum amount of iterations for given size
+ 176              	@ r0: size of table, r1: ptr to start of table
+ 177              	f_full_init_table:
+ 178 00e4 4FEA5002 	        MOV r2, r0, LSR 1
  179              	
- 180 00d0 0C46     	        MOV r4, r1
- 181 00d2 04F10404 	        ADD r4, #0x04
- 182              	
- 183 00d6 5D46     	        MOV r5, r11
- 184 00d8 00F0E2F8 	        BL f_getbit
- 185 00dc 4FF0000C 	        LDR r12, =#0x00
- 186 00e0 86B3     	        CBZ r6, l_not_in_table
- 187              	
- 188              	        @ check whether keys are same
- 189 00e2 4FEA5016 	        MOV r6, r0, LSR 5
- 190 00e6 06F10106 	        ADD r6, #0x01
- 191 00ea 4FEA8606 	        LSL r6, #0x02
- 192 00ee 2644     	        ADD r6, r4
- 193 00f0 3746     	        MOV r7, r6
+ 180              	@ r0: size of table, r1: ptr to start of table, r2: max iterations
+ 181              	f_init_table:
+ 182 00e8 C1F80020 	        STR.W r2, [r1]
+ 183              	
+ 184 00ec 02B5     	        PUSH { r1, lr }
+ 185 00ee 01F10101 	        ADD r1, #0x01
+ 186 00f2 4FEA5012 	        LSR r2, r0, #0x05
+ 187 00f6 02F10102 	        ADD r2, #0x01
+ 188 00fa 00F0DEF8 	        BL f_clear_words
+ 189              	
+ 190 00fe BDE80240 	        POP { r1, lr }
+ 191 0102 7047     	        BX lr
+ 192              	
+ 193              	
  194              	
- 195 00f2 06EBC509 	        ADD r9, r6, r5, LSL 3
- 196              	
- 197 00f6 D9F800A0 	        LDR r10, [r9]
- 198 00fa 9245     	        CMP r10, r2
- 199 00fc 1CD0     	        BEQ l_in_table
- 200              	
- 201              	        @ resolve collision
- 202              	        @ r3: amount of iters, r4: ptr to bitset, r5: index, r6: pointer to start of kv-pairs r9: p
+ 195              	@ r0: size of table, r1: ptr to start of table, r2: key
+ 196              	@ return: r3: value, r4: bool that indicates whether found, r5: amount of collisions
+ 197              	f_table_get:
+ 198              	        @ 1. hash value, 2. check whether bit set, 3a. if not, r4=0, 3b. if yes loop with quadratic
+ 199 0104 2DE9C05E 	        PUSH {r6, r7, r9, r10, r11, r12, lr}
+ 200 0108 9146     	        MOV r9, r2
+ 201 010a 8246     	        MOV r10, r0
+ 202 010c 00F0CAF8 	        BL f_modulo
  203              	
- 204 00fe 4FF0010C 	        LDR r12, =#0x01
- 205 0102 0B68     	        LDR r3, [r1]
- 206              	
- 207              	l_collision_resolve_loop_get:
- 208 0104 0CFB0C55 	        MLA r5, r12, r12, r5
- 209 0108 8542     	        CMP r5, r0
- 210              	
- 211 010a 04D3     	        BCC l_no_mod
- 212 010c A946     	        MOV r9, r5
- 213 010e 8246     	        MOV r10, r0
- 214 0110 00F097F8 	        BL f_modulo
- 215 0114 5D46     	        MOV r5, r11
- 216              	
- 217              	l_no_mod:
- 218 0116 00F0C3F8 	        BL f_getbit
- 219 011a 9EB1     	        CBZ r6, l_not_in_table
- 220              	
- 221              	        @ bit is set, check contents
- 222 011c 07EBC509 	        ADD r9, r7, r5, LSL 3
- 223 0120 D9F800A0 	        LDR r10, [r9]
- 224 0124 9245     	        CMP r10, r2
- 225 0126 06D0     	        BEQ l_found_with_collisions
- 226              	
- 227              	        @ update counters
- 228 0128 0CF1010C 	        ADD r12, #0x01
+ 204              	
+ 205 0110 0C46     	        MOV r4, r1
+ 206 0112 04F10404 	        ADD r4, #0x04
+ 207              	
+ 208 0116 5D46     	        MOV r5, r11
+ 209 0118 00F0F3F8 	        BL f_getbit
+ 210 011c 4FF0000C 	        LDR r12, =#0x00
+ 211 0120 A6B3     	        CBZ r6, l_not_in_table
+ 212              	
+ 213              	        @ check whether keys are same
+ 214 0122 4FEA5016 	        MOV r6, r0, LSR 5
+ 215 0126 06F10106 	        ADD r6, #0x01
+ 216 012a 4FEA8606 	        LSL r6, #0x02
+ 217 012e 2644     	        ADD r6, r4
+ 218 0130 3746     	        MOV r7, r6
+ 219              	
+ 220 0132 06EBC509 	        ADD r9, r6, r5, LSL 3
+ 221              	
+ 222 0136 D9F800A0 	        LDR r10, [r9]
+ 223 013a 9245     	        CMP r10, r2
+ 224 013c 1CD0     	        BEQ l_in_table
+ 225              	
+ 226              	        @ resolve collision
+ 227              	        @ r3: amount of iters, r4: ptr to bitset, r5: index, r6: pointer to start of kv-pairs r9: p
+ 228              	
 ARM GAS  ./hashtable.asm 			page 5
 
 
- 229 012c A3F10103 	        SUB r3, #0x01
- 230 0130 002B     	        CMP r3, #0x00
- 231 0132 E7D1     	        BNE l_collision_resolve_loop_get
- 232              	
- 233              	        @ endloop
- 234 0134 06E0     	        B l_not_in_table
+ 229 013e 4FF0010C 	        LDR r12, =#0x01
+ 230 0142 0B68     	        LDR r3, [r1]
+ 231              	
+ 232              	l_collision_resolve_loop_get:
+ 233 0144 0CFB0C55 	        MLA r5, r12, r12, r5
+ 234 0148 8542     	        CMP r5, r0
  235              	
- 236              	l_found_with_collisions:
- 237 0136 6546     	        MOV r5, r12
- 238              	l_in_table:
- 239 0138 09F10409 	        ADD r9, #0x04
- 240 013c D9F80030 	        LDR r3, [r9]
- 241 0140 0124     	        LDR r4, =#0x01
- 242 0142 02E0     	        B l_ret_from_get
- 243              	
- 244              	l_not_in_table:
- 245 0144 6546     	        MOV r5, r12
- 246 0146 84EA0404 	        EOR r4, r4
- 247              	
- 248              	l_ret_from_get:
- 249 014a BDE8C05E 	        POP {r6, r7, r9, r10, r11, r12, lr}
- 250 014e 7047     	        BX lr
+ 236 014a 04D3     	        BCC l_no_mod
+ 237 014c A946     	        MOV r9, r5
+ 238 014e 8246     	        MOV r10, r0
+ 239 0150 00F0A8F8 	        BL f_modulo
+ 240 0154 5D46     	        MOV r5, r11
+ 241              	
+ 242              	l_no_mod:
+ 243 0156 00F0D4F8 	        BL f_getbit
+ 244 015a BEB1     	        CBZ r6, l_not_in_table
+ 245              	
+ 246              	        @ bit is set, check contents
+ 247 015c 07EBC509 	        ADD r9, r7, r5, LSL 3
+ 248 0160 D9F800A0 	        LDR r10, [r9]
+ 249 0164 9245     	        CMP r10, r2
+ 250 0166 06D0     	        BEQ l_found_with_collisions
  251              	
- 252              	
- 253              	@ r0: size of table, r1: ptr to start of table, r2: key, r3: value
- 254              	@ return: r4: bool that indicates whether able to insert
- 255              	f_table_set:
- 256 0150 2DE9E05F 	        PUSH {r5, r6, r7, r8, r9, r10, r11, r12, lr}
- 257 0154 9146     	        MOV r9, r2
- 258 0156 8246     	        MOV r10, r0
- 259 0158 00F073F8 	        BL f_modulo
- 260              	        @ r11 now "hashed"
- 261              	
- 262 015c 01F10404 	        ADD r4, r1, #0x04
- 263 0160 5D46     	        MOV r5, r11
- 264 0162 00F09DF8 	        BL f_getbit
- 265              	
- 266 0166 4FEA5017 	        MOV r7, r0, LSR 5
- 267 016a 07F10107 	        ADD r7, #0x01
- 268 016e 4FEA8707 	        LSL r7, #0x02
- 269 0172 2744     	        ADD r7, r4
- 270              	        @ r7 now pointer on start of kv-pairs
+ 252              	        @ update counters
+ 253 0168 0CF1010C 	        ADD r12, #0x01
+ 254 016c A3F10103 	        SUB r3, #0x01
+ 255 0170 002B     	        CMP r3, #0x00
+ 256 0172 E7D1     	        BNE l_collision_resolve_loop_get
+ 257              	
+ 258              	        @ endloop
+ 259 0174 0AE0     	        B l_not_in_table
+ 260              	
+ 261              	l_found_with_collisions:
+ 262 0176 6546     	        MOV r5, r12
+ 263              	l_in_table:
+ 264 0178 BCF1000F 	        CMP r12, #0x00
+ 265 017c 08BF     	        IT EQ
+ 266 017e 0025     	        LDREQ r5, =#0x00
+ 267 0180 09F10409 	        ADD r9, #0x04
+ 268 0184 D9F80030 	        LDR r3, [r9]
+ 269 0188 0124     	        LDR r4, =#0x01
+ 270 018a 02E0     	        B l_ret_from_get
  271              	
- 272 0174 07EBC508 	        ADD r8, r7, r5, LSL 3
- 273 0178 2EB3     	        CBZ r6, l_insert
- 274              	
- 275              	        @ check whether contents equal
- 276 017a D8F80090 	        LDR r9, [r8]
- 277 017e 4A45     	        CMP r2, r9
- 278 0180 2AD0     	        BEQ l_insert_content
+ 272              	l_not_in_table:
+ 273 018c 6546     	        MOV r5, r12
+ 274 018e 84EA0404 	        EOR r4, r4
+ 275              	
+ 276              	l_ret_from_get:
+ 277 0192 BDE8C05E 	        POP {r6, r7, r9, r10, r11, r12, lr}
+ 278 0196 7047     	        BX lr
  279              	
- 280              	        @ resolve collision
- 281 0182 4FF0010C 	        LDR r12, =#0x01
- 282 0186 0C68     	        LDR r4, [r1]
- 283              	
- 284              	l_collision_resolve_loop_set:
- 285 0188 0CFB0C55 	        MLA r5, r12, r12, r5
+ 280              	
+ 281              	@ r0: size of table, r1: ptr to start of table, r2: key, r3: value
+ 282              	@ return: r4: bool that indicates whether able to insert
+ 283              	f_table_set:
+ 284 0198 2DE9E05F 	        PUSH {r5, r6, r7, r8, r9, r10, r11, r12, lr}
+ 285 019c 9146     	        MOV r9, r2
 ARM GAS  ./hashtable.asm 			page 6
 
 
- 286 018c 8542     	        CMP r5, r0
- 287              	
- 288 018e 04D3     	        BCC l_no_mod_needed
- 289 0190 A946     	        MOV r9, r5
- 290 0192 8246     	        MOV r10, r0
- 291 0194 00F055F8 	        BL f_modulo
- 292 0198 5D46     	        MOV r5, r11
+ 286 019e 8246     	        MOV r10, r0
+ 287 01a0 00F080F8 	        BL f_modulo
+ 288              	        @ r11 now "hashed"
+ 289              	
+ 290 01a4 01F10404 	        ADD r4, r1, #0x04
+ 291 01a8 5D46     	        MOV r5, r11
+ 292 01aa 00F0AAF8 	        BL f_getbit
  293              	
- 294              	l_no_mod_needed:
- 295 019a A346     	        MOV r11, r4
- 296 019c 01F10404 	        ADD r4, r1, #0x04
- 297 01a0 00F07EF8 	        BL f_getbit
- 298 01a4 5C46     	        MOV r4, r11
+ 294 01ae 4FEA5017 	        MOV r7, r0, LSR 5
+ 295 01b2 07F10107 	        ADD r7, #0x01
+ 296 01b6 4FEA8707 	        LSL r7, #0x02
+ 297 01ba 2744     	        ADD r7, r4
+ 298              	        @ r7 now pointer on start of kv-pairs
  299              	
- 300 01a6 07EBC508 	        ADD r8, r7, r5, LSL 3
- 301 01aa 66B1     	        CBZ r6, l_insert
+ 300 01bc 07EBC508 	        ADD r8, r7, r5, LSL 3
+ 301 01c0 2EB3     	        CBZ r6, l_insert
  302              	
- 303              	        @ bit is set, check contents
- 304              	
- 305 01ac D8F80090 	        LDR r9, [r8]
- 306 01b0 9145     	        CMP r9, r2
- 307 01b2 11D0     	        BEQ l_insert_content
- 308              	
- 309              	        @ update counters
- 310 01b4 0CF1010C 	        ADD r12, #0x01
- 311 01b8 A4F10104 	        SUB r4, #0x01
- 312 01bc 002C     	        CMP r4, #0x00
- 313 01be E3D1     	        BNE l_collision_resolve_loop_set
- 314              	
- 315              	        @ endloop
- 316              	
- 317 01c0 84EA0404 	        EOR r4, r4
- 318 01c4 0DE0     	        B l_ret_from_set
- 319              	
- 320              	
+ 303              	        @ check whether contents equal
+ 304 01c2 D8F80090 	        LDR r9, [r8]
+ 305 01c6 4A45     	        CMP r2, r9
+ 306 01c8 2AD0     	        BEQ l_insert_content
+ 307              	
+ 308              	        @ resolve collision
+ 309 01ca 4FF0010C 	        LDR r12, =#0x01
+ 310 01ce 0C68     	        LDR r4, [r1]
+ 311              	
+ 312              	l_collision_resolve_loop_set:
+ 313 01d0 0CFB0C55 	        MLA r5, r12, r12, r5
+ 314 01d4 8542     	        CMP r5, r0
+ 315              	
+ 316 01d6 04D3     	        BCC l_no_mod_needed
+ 317 01d8 A946     	        MOV r9, r5
+ 318 01da 8246     	        MOV r10, r0
+ 319 01dc 00F062F8 	        BL f_modulo
+ 320 01e0 5D46     	        MOV r5, r11
  321              	
- 322              	l_insert:
- 323 01c6 9C46     	        MOV r12, r3
- 324 01c8 2B46     	        MOV r3, r5
- 325 01ca 01F10404 	        ADD r4, r1, #0x04
- 326 01ce 00F051F8 	        BL f_setbit
+ 322              	l_no_mod_needed:
+ 323 01e2 A346     	        MOV r11, r4
+ 324 01e4 01F10404 	        ADD r4, r1, #0x04
+ 325 01e8 00F08BF8 	        BL f_getbit
+ 326 01ec 5C46     	        MOV r4, r11
  327              	
- 328 01d2 C8F80020 	        STR r2, [r8]
- 329 01d6 6346     	        MOV r3, r12
- 330              	l_insert_content:
- 331 01d8 08F10408 	        ADD r8, #0x04
- 332 01dc C8F80030 	        STR.W r3, [r8]
- 333 01e0 0124     	        LDR r4, =#0x01
- 334              	l_ret_from_set:
- 335 01e2 BDE8E05F 	        POP {r5, r6, r7, r8, r9, r10, r11, r12, lr}
- 336 01e6 7047     	        BX lr
- 337              	
- 338              	
- 339              	@ r0: size of table, r1: ptr to start of table
- 340              	f_table_clear:
- 341 01e8 02B5     	        PUSH {r1, lr}
- 342 01ea 01F10101 	        ADD r1, #0x01
+ 328 01ee 07EBC508 	        ADD r8, r7, r5, LSL 3
+ 329 01f2 66B1     	        CBZ r6, l_insert
+ 330              	
+ 331              	        @ bit is set, check contents
+ 332              	
+ 333 01f4 D8F80090 	        LDR r9, [r8]
+ 334 01f8 9145     	        CMP r9, r2
+ 335 01fa 11D0     	        BEQ l_insert_content
+ 336              	
+ 337              	        @ update counters
+ 338 01fc 0CF1010C 	        ADD r12, #0x01
+ 339 0200 A4F10104 	        SUB r4, #0x01
+ 340 0204 002C     	        CMP r4, #0x00
+ 341 0206 E3D1     	        BNE l_collision_resolve_loop_set
+ 342              	
 ARM GAS  ./hashtable.asm 			page 7
 
 
- 343 01ee 4FEA5012 	        LSR r2, r0, #0x05
- 344 01f2 02F10102 	        ADD r2, #0x01
- 345 01f6 00F02FF8 	        BL f_clear_words
- 346              	
- 347 01fa BDE80240 	        POP {r1, lr}
- 348 01fe 7047     	        BX lr
+ 343              	        @ endloop
+ 344              	
+ 345 0208 84EA0404 	        EOR r4, r4
+ 346 020c 0DE0     	        B l_ret_from_set
+ 347              	
+ 348              	
  349              	
- 350              	@ r0: size of table, r1: ptr to start of table
- 351              	@ return: r5: amount of elements
- 352              	f_table_amount_elements:
- 353 0200 D8B4     	        PUSH { r3, r4, r6, r7 }
- 354 0202 85EA0505 	        EOR r5, r5
+ 350              	l_insert:
+ 351 020e 9C46     	        MOV r12, r3
+ 352 0210 2B46     	        MOV r3, r5
+ 353 0212 01F10404 	        ADD r4, r1, #0x04
+ 354 0216 00F05EF8 	        BL f_setbit
  355              	
- 356 0206 0028     	        CMP r0, #0x00
- 357 0208 11D0     	        BEQ ret_from_amount_elements
- 358              	
- 359 020a 0746     	        MOV r7, r0
- 360              	
- 361 020c 0B46     	        MOV r3, r1
- 362 020e 03F10403 	        ADD r3, #0x04
- 363              	
- 364              	l_word_check_loop:
- 365 0212 1C68     	        LDR r4, [r3]
- 366 0214 03F10403 	        ADD r3, #0x04
- 367              	
- 368              	l_bit_check_loop:
- 369 0218 14F00106 	        ANDS r6, r4, #0x01
- 370 021c 4FEA5404 	        LSR r4, 1
- 371 0220 3544     	        ADD r5, r6
- 372              	
- 373 0222 A7F10107 	        SUB r7, #0x01
- 374 0226 17B1     	        CBZ r7, ret_from_amount_elements
- 375              	
- 376 0228 002C     	        CMP r4, #0x00
- 377 022a F2D0     	        BEQ l_word_check_loop
- 378              	
- 379 022c F4E7     	        B l_bit_check_loop
- 380              	
- 381              	
- 382              	ret_from_amount_elements:
- 383 022e D8BC     	        POP { r3, r4, r6, r7 }
- 384 0230 7047     	        BX lr
- 385              	
+ 356 021a C8F80020 	        STR r2, [r8]
+ 357 021e 6346     	        MOV r3, r12
+ 358              	l_insert_content:
+ 359 0220 08F10408 	        ADD r8, #0x04
+ 360 0224 C8F80030 	        STR.W r3, [r8]
+ 361 0228 0124     	        LDR r4, =#0x01
+ 362              	l_ret_from_set:
+ 363 022a BDE8E05F 	        POP {r5, r6, r7, r8, r9, r10, r11, r12, lr}
+ 364 022e 7047     	        BX lr
+ 365              	
+ 366              	
+ 367              	@ r0: size of table, r1: ptr to start of table
+ 368              	f_table_clear:
+ 369 0230 02B5     	        PUSH {r1, lr}
+ 370 0232 01F10101 	        ADD r1, #0x01
+ 371 0236 4FEA5012 	        LSR r2, r0, #0x05
+ 372 023a 02F10102 	        ADD r2, #0x01
+ 373 023e 00F03CF8 	        BL f_clear_words
+ 374              	
+ 375 0242 BDE80240 	        POP {r1, lr}
+ 376 0246 7047     	        BX lr
+ 377              	
+ 378              	@ r0: size of table, r1: ptr to start of table
+ 379              	@ return: r5: amount of elements
+ 380              	f_table_amount_elements:
+ 381 0248 2DE9D801 	        PUSH { r3, r4, r6, r7, r8 }
+ 382 024c 85EA0505 	        EOR r5, r5
+ 383              	
+ 384 0250 0028     	        CMP r0, #0x00
+ 385 0252 1CD0     	        BEQ ret_from_amount_elements
  386              	
- 387              	
- 388              	@---------------------------------------------------------------------------------------------
- 389              	@ external algorithms
- 390              	
+ 387 0254 0746     	        MOV r7, r0
+ 388              	
+ 389 0256 0B46     	        MOV r3, r1
+ 390 0258 03F10403 	        ADD r3, #0x04
  391              	
- 392              	@ generate a random integer using "xorshift"
- 393              	@ r3: random seed
- 394              	@ return: r4: "random" value
- 395              	f_randint:
- 396 0232 1C46     	        MOV r4, r3
- 397 0234 84EA4434 	        EOR r4, r4, r4, LSL 13
- 398 0238 84EA5444 	        EOR r4, r4, r4, LSR 17
- 399 023c 84EA4414 	        EOR r4, r4, r4, LSL 5
+ 392              	l_word_check_loop:
+ 393 025c BFB1     	        CBZ r7, ret_from_amount_elements
+ 394 025e 1C68     	        LDR r4, [r3]
+ 395 0260 03F10403 	        ADD r3, #0x04
+ 396              	
+ 397 0264 4FF02008 	        LDR r8, =#0x20
+ 398 0268 202F     	        CMP r7, #0x20
+ 399 026a 00D2     	        BCS l_bit_check_loop
 ARM GAS  ./hashtable.asm 			page 8
 
 
- 400 0240 7047     	        BX lr
+ 400 026c B846     	        MOV r8, r7
  401              	
- 402              	
- 403              	@ r9: value, r10: divisor
- 404              	@ return r11: result
- 405              	f_modulo:
- 406 0242 4DF804CD 	        PUSH {r12}
- 407 0246 B9FBFAFB 	        UDIV r11, r9, r10
- 408 024a 0AFB0BFC 	        MUL r12, r10, r11
- 409 024e A9EB0C0B 	        SUB r11, r9, r12
- 410 0252 5DF804CB 	        POP {r12}
- 411 0256 7047     	        BX lr
- 412              	
- 413              	@-----------------------------------------------------------------------------------
- 414              	@ bit manipulation functions
+ 402              	l_bit_check_loop:
+ 403 026e 14F00106 	        ANDS r6, r4, #0x01
+ 404 0272 4FEA5404 	        LSR r4, 1
+ 405 0276 3544     	        ADD r5, r6
+ 406              	
+ 407 0278 A8F10108 	        SUB r8, #0x01
+ 408 027c A7F10107 	        SUB r7, #0x01
+ 409 0280 2FB1     	        CBZ r7, ret_from_amount_elements
+ 410              	
+ 411 0282 002C     	        CMP r4, #0x00
+ 412 0284 04BF     	        ITT EQ
+ 413 0286 A7EB0807 	        SUBEQ r7, r8
+ 414 028a E7E7     	        BEQ l_word_check_loop
  415              	
- 416              	@ r2: amount_words, r1: ptr
- 417              	f_clear_words:
- 418 0258 C0B4     	        PUSH {r6, r7}
- 419 025a 0F46     	        MOV r7, r1
- 420 025c 86EA0606 	        EOR r6, r6
- 421              	
- 422              	l_clear_loop:
- 423 0260 C7F80060 	        STR.W r6, [r7]
- 424 0264 07F10407 	        ADD r7, #0x04
- 425 0268 A2F10102 	        SUB r2, #0x01
- 426 026c 002A     	        CMP r2, #0x00
- 427 026e F7D1     	        BNE l_clear_loop
+ 416 028c EFE7     	        B l_bit_check_loop
+ 417              	
+ 418              	
+ 419              	ret_from_amount_elements:
+ 420 028e BDE8D801 	        POP { r3, r4, r6, r7, r8 }
+ 421 0292 7047     	        BX lr
+ 422              	
+ 423              	
+ 424              	
+ 425              	@---------------------------------------------------------------------------------------------
+ 426              	@ external algorithms
+ 427              	
  428              	
- 429              	        @ endloop
- 430 0270 C0BC     	        POP {r6, r7}
- 431 0272 7047     	        BX lr
- 432              	
- 433              	
- 434              	@ r3: index, r4: pointer to first bit block
- 435              	f_setbit:
- 436 0274 2DE96001 	        PUSH {r5,r6,r8}
- 437              	
- 438 0278 4FEA5316 	        MOV r6, r3, LSR 5
- 439 027c 04EB8605 	        ADD r5, r4, r6, LSL 2
- 440 0280 03F01F06 	        AND r6, r3, #0x1F
- 441 0284 4FF00108 	        LDR r8, =#0x01
- 442 0288 08FA06F8 	        LSL r8, r6
- 443 028c 4646     	        MOV r6, r8
- 444 028e D5F80080 	        LDR r8, [r5]
- 445 0292 48EA0608 	        ORR r8, r6
- 446 0296 C5F80080 	        STR.W r8, [r5]
- 447              	
- 448 029a BDE86001 	        POP {r5, r6,r8}
- 449 029e 7047     	        BX lr
- 450              	
- 451              	
- 452              	@ r5: index, r4: pointer
- 453              	@ return: r6: bool set
- 454              	f_getbit:
- 455 02a0 2DE9A001 	        PUSH  {r5, r7, r8}
- 456 02a4 4FEA5516 	        MOV r6, r5, LSR 5
+ 429              	@ generate a random integer using "xorshift"
+ 430              	@ r3: random seed
+ 431              	@ return: r4: "random" value
+ 432              	f_randint:
+ 433 0294 1C46     	        MOV r4, r3
+ 434 0296 84EA4434 	        EOR r4, r4, r4, LSL 13
+ 435 029a 84EA5444 	        EOR r4, r4, r4, LSR 17
+ 436 029e 84EA4414 	        EOR r4, r4, r4, LSL 5
+ 437 02a2 7047     	        BX lr
+ 438              	
+ 439              	
+ 440              	@ r9: value, r10: divisor
+ 441              	@ return r11: result
+ 442              	f_modulo:
+ 443 02a4 4DF804CD 	        PUSH {r12}
+ 444 02a8 B9FBFAFB 	        UDIV r11, r9, r10
+ 445 02ac 0AFB0BFC 	        MUL r12, r10, r11
+ 446 02b0 A9EB0C0B 	        SUB r11, r9, r12
+ 447 02b4 5DF804CB 	        POP {r12}
+ 448 02b8 7047     	        BX lr
+ 449              	
+ 450              	@-----------------------------------------------------------------------------------
+ 451              	@ bit manipulation functions
+ 452              	
+ 453              	@ r2: amount_words, r1: ptr
+ 454              	f_clear_words:
+ 455 02ba C0B4     	        PUSH {r6, r7}
+ 456 02bc 0F46     	        MOV r7, r1
 ARM GAS  ./hashtable.asm 			page 9
 
 
- 457 02a8 2F46     	        MOV r7, r5
- 458 02aa 04EB8605 	        ADD r5, r4, r6, LSL 2
- 459 02ae 07F01F06 	        AND r6, r7, #0x1F
- 460 02b2 D5F80080 	        LDR r8, [r5]
- 461 02b6 28FA06F8 	        LSR r8, r6
- 462 02ba 0126     	        LDR r6, =#0x01
- 463              	
- 464 02bc 08F00108 	        AND r8, #0x01
- 465 02c0 B8F1000F 	        CMP r8, #0x00
- 466 02c4 01D1     	        BNE l_not_zero
- 467 02c6 86EA0606 	        EOR r6, r6
- 468              	
- 469              	l_not_zero:
- 470 02ca BDE8A001 	        POP   {r5, r7, r8}
- 471 02ce 7047     	        BX lr
- 472              	
- 473              	
- 474              	f_clear_bit:
- 475 02d0 2DE96001 	        PUSH {r5,r6,r8}
- 476              	
- 477 02d4 4FEA5316 	        LSR r6, r3, 5
- 478 02d8 04EB8605 	        ADD r5, r4, r6, LSL 2
- 479 02dc 06F01F06 	        AND r6, #0x1F
- 480 02e0 4FF00108 	        LDR r8, =#0x01
- 481 02e4 08FA06F8 	        LSL r8, r6
- 482 02e8 86EA0606 	        EOR r6, r6
- 483 02ec A6F10106 	        SUB r6, #0x01
- 484 02f0 86EA0806 	        EOR r6, r8
- 485 02f4 D5F80080 	        LDR r8, [r5]
- 486 02f8 08EA0608 	        AND r8, r6
- 487 02fc C5F80080 	        STR.W r8, [r5]
- 488 0300 BDE86001 	        POP {r5, r6,r8}
- 489              	
- 490 0304 7047     	        BX lr
- 491              	
- 492              	
- 493              	
- 494              	_dummy:                        @ if any int gets triggered, just hang in a loop
- 495              	_nmi_handler:
- 496              	_hard_fault:
- 497              	_memory_fault:
- 498              	_bus_fault:
- 499              	_usage_fault:
- 500 0306 00F10100 	        add r0, 1
- 501 030a 01F10101 	        add r1, 1
- 502 030e FAE70015 	        b _dummy
- 502      0020A1B0 
- 502      B912
+ 457 02be 86EA0606 	        EOR r6, r6
+ 458              	
+ 459              	l_clear_loop:
+ 460 02c2 C7F80060 	        STR.W r6, [r7]
+ 461 02c6 07F10407 	        ADD r7, #0x04
+ 462 02ca A2F10102 	        SUB r2, #0x01
+ 463 02ce 002A     	        CMP r2, #0x00
+ 464 02d0 F7D1     	        BNE l_clear_loop
+ 465              	
+ 466              	        @ endloop
+ 467 02d2 C0BC     	        POP {r6, r7}
+ 468 02d4 7047     	        BX lr
+ 469              	
+ 470              	
+ 471              	@ r3: index, r4: pointer to first bit block
+ 472              	f_setbit:
+ 473 02d6 2DE96001 	        PUSH {r5,r6,r8}
+ 474              	
+ 475 02da 4FEA5316 	        MOV r6, r3, LSR 5
+ 476 02de 04EB8605 	        ADD r5, r4, r6, LSL 2
+ 477 02e2 03F01F06 	        AND r6, r3, #0x1F
+ 478 02e6 4FF00108 	        LDR r8, =#0x01
+ 479 02ea 08FA06F8 	        LSL r8, r6
+ 480 02ee 4646     	        MOV r6, r8
+ 481 02f0 D5F80080 	        LDR r8, [r5]
+ 482 02f4 48EA0608 	        ORR r8, r6
+ 483 02f8 C5F80080 	        STR.W r8, [r5]
+ 484              	
+ 485 02fc BDE86001 	        POP {r5, r6,r8}
+ 486 0300 7047     	        BX lr
+ 487              	
+ 488              	
+ 489              	@ r5: index, r4: pointer
+ 490              	@ return: r6: bool set
+ 491              	f_getbit:
+ 492 0302 2DE9A001 	        PUSH  {r5, r7, r8}
+ 493 0306 4FEA5516 	        MOV r6, r5, LSR 5
+ 494 030a 2F46     	        MOV r7, r5
+ 495 030c 04EB8605 	        ADD r5, r4, r6, LSL 2
+ 496 0310 07F01F06 	        AND r6, r7, #0x1F
+ 497 0314 D5F80080 	        LDR r8, [r5]
+ 498 0318 28FA06F8 	        LSR r8, r6
+ 499 031c 0126     	        LDR r6, =#0x01
+ 500              	
+ 501 031e 08F00108 	        AND r8, #0x01
+ 502 0322 B8F1000F 	        CMP r8, #0x00
+ 503 0326 01D1     	        BNE l_not_zero
+ 504 0328 86EA0606 	        EOR r6, r6
+ 505              	
+ 506              	l_not_zero:
+ 507 032c BDE8A001 	        POP   {r5, r7, r8}
+ 508 0330 7047     	        BX lr
+ 509              	
+ 510              	
+ 511              	f_clear_bit:
+ 512 0332 2DE96001 	        PUSH {r5,r6,r8}
+ 513              	
 ARM GAS  ./hashtable.asm 			page 10
 
 
+ 514 0336 4FEA5316 	        LSR r6, r3, 5
+ 515 033a 04EB8605 	        ADD r5, r4, r6, LSL 2
+ 516 033e 06F01F06 	        AND r6, #0x1F
+ 517 0342 4FF00108 	        LDR r8, =#0x01
+ 518 0346 08FA06F8 	        LSL r8, r6
+ 519 034a 86EA0606 	        EOR r6, r6
+ 520 034e A6F10106 	        SUB r6, #0x01
+ 521 0352 86EA0806 	        EOR r6, r8
+ 522 0356 D5F80080 	        LDR r8, [r5]
+ 523 035a 08EA0608 	        AND r8, r6
+ 524 035e C5F80080 	        STR.W r8, [r5]
+ 525 0362 BDE86001 	        POP {r5, r6,r8}
+ 526              	
+ 527 0366 7047     	        BX lr
+ 528              	
+ 529              	
+ 530              	
+ 531              	_dummy:                        @ if any int gets triggered, just hang in a loop
+ 532              	_nmi_handler:
+ 533              	_hard_fault:
+ 534              	_memory_fault:
+ 535              	_bus_fault:
+ 536              	_usage_fault:
+ 537 0368 00F10100 	        add r0, 1
+ 538 036c 01F10101 	        add r1, 1
+ 539 0370 FAE70000 	        b _dummy
+ 539      00150020 
+ 539      A1B0B912 
+ARM GAS  ./hashtable.asm 			page 11
+
+
 DEFINED SYMBOLS
-     ./hashtable.asm:6      *ABS*:00000000000000c8 TABLE_SIZE
+     ./hashtable.asm:6      *ABS*:00000000000001f4 TABLE_SIZE
      ./hashtable.asm:7      *ABS*:0000000020001500 TABLE_PTR
      ./hashtable.asm:8      *ABS*:0000000020000000 ARRAY_PTR
      ./hashtable.asm:9      *ABS*:0000000020005000 STACKINIT
      ./hashtable.asm:13     .text:0000000000000000 vectors
      ./hashtable.asm:34     .text:000000000000001c _start
-     ./hashtable.asm:495    .text:0000000000000306 _nmi_handler
-     ./hashtable.asm:496    .text:0000000000000306 _hard_fault
-     ./hashtable.asm:497    .text:0000000000000306 _memory_fault
-     ./hashtable.asm:498    .text:0000000000000306 _bus_fault
-     ./hashtable.asm:499    .text:0000000000000306 _usage_fault
+     ./hashtable.asm:532    .text:0000000000000368 _nmi_handler
+     ./hashtable.asm:533    .text:0000000000000368 _hard_fault
+     ./hashtable.asm:534    .text:0000000000000368 _memory_fault
+     ./hashtable.asm:535    .text:0000000000000368 _bus_fault
+     ./hashtable.asm:536    .text:0000000000000368 _usage_fault
                             .text:0000000000000000 $d
      ./hashtable.asm:37     .text:000000000000001c $t
-     ./hashtable.asm:152    .text:00000000000000a4 f_full_init_table
-     ./hashtable.asm:85     .text:0000000000000032 f_test_suite
-     ./hashtable.asm:94     .text:0000000000000044 l_element_fill_loop
-     ./hashtable.asm:395    .text:0000000000000232 f_randint
-     ./hashtable.asm:255    .text:0000000000000150 f_table_set
-     ./hashtable.asm:352    .text:0000000000000200 f_table_amount_elements
-     ./hashtable.asm:123    .text:000000000000007e l_element_get_loop
-     ./hashtable.asm:172    .text:00000000000000c4 f_table_get
-     ./hashtable.asm:144    .text:000000000000009e l_error_occured
-     ./hashtable.asm:156    .text:00000000000000a8 f_init_table
-     ./hashtable.asm:417    .text:0000000000000258 f_clear_words
-     ./hashtable.asm:405    .text:0000000000000242 f_modulo
-     ./hashtable.asm:454    .text:00000000000002a0 f_getbit
-     ./hashtable.asm:244    .text:0000000000000144 l_not_in_table
-     ./hashtable.asm:238    .text:0000000000000138 l_in_table
-     ./hashtable.asm:207    .text:0000000000000104 l_collision_resolve_loop_get
-     ./hashtable.asm:217    .text:0000000000000116 l_no_mod
-     ./hashtable.asm:236    .text:0000000000000136 l_found_with_collisions
-     ./hashtable.asm:248    .text:000000000000014a l_ret_from_get
-     ./hashtable.asm:322    .text:00000000000001c6 l_insert
-     ./hashtable.asm:330    .text:00000000000001d8 l_insert_content
-     ./hashtable.asm:284    .text:0000000000000188 l_collision_resolve_loop_set
-     ./hashtable.asm:294    .text:000000000000019a l_no_mod_needed
-     ./hashtable.asm:334    .text:00000000000001e2 l_ret_from_set
-     ./hashtable.asm:435    .text:0000000000000274 f_setbit
-     ./hashtable.asm:340    .text:00000000000001e8 f_table_clear
-     ./hashtable.asm:382    .text:000000000000022e ret_from_amount_elements
-     ./hashtable.asm:364    .text:0000000000000212 l_word_check_loop
-     ./hashtable.asm:368    .text:0000000000000218 l_bit_check_loop
-     ./hashtable.asm:422    .text:0000000000000260 l_clear_loop
-     ./hashtable.asm:469    .text:00000000000002ca l_not_zero
-     ./hashtable.asm:474    .text:00000000000002d0 f_clear_bit
-     ./hashtable.asm:494    .text:0000000000000306 _dummy
-     ./hashtable.asm:502    .text:0000000000000310 $d
+     ./hashtable.asm:177    .text:00000000000000e4 f_full_init_table
+     ./hashtable.asm:102    .text:0000000000000060 f_test_suite
+     ./hashtable.asm:380    .text:0000000000000248 f_table_amount_elements
+     ./hashtable.asm:111    .text:0000000000000072 l_element_fill_loop
+     ./hashtable.asm:432    .text:0000000000000294 f_randint
+     ./hashtable.asm:283    .text:0000000000000198 f_table_set
+     ./hashtable.asm:141    .text:00000000000000ac l_filled_hash_table
+     ./hashtable.asm:146    .text:00000000000000b4 l_element_get_loop
+     ./hashtable.asm:197    .text:0000000000000104 f_table_get
+     ./hashtable.asm:169    .text:00000000000000de l_error_occured
+     ./hashtable.asm:181    .text:00000000000000e8 f_init_table
+     ./hashtable.asm:454    .text:00000000000002ba f_clear_words
+     ./hashtable.asm:442    .text:00000000000002a4 f_modulo
+     ./hashtable.asm:491    .text:0000000000000302 f_getbit
+     ./hashtable.asm:272    .text:000000000000018c l_not_in_table
+     ./hashtable.asm:263    .text:0000000000000178 l_in_table
+     ./hashtable.asm:232    .text:0000000000000144 l_collision_resolve_loop_get
+     ./hashtable.asm:242    .text:0000000000000156 l_no_mod
+     ./hashtable.asm:261    .text:0000000000000176 l_found_with_collisions
+     ./hashtable.asm:276    .text:0000000000000192 l_ret_from_get
+     ./hashtable.asm:350    .text:000000000000020e l_insert
+     ./hashtable.asm:358    .text:0000000000000220 l_insert_content
+     ./hashtable.asm:312    .text:00000000000001d0 l_collision_resolve_loop_set
+     ./hashtable.asm:322    .text:00000000000001e2 l_no_mod_needed
+     ./hashtable.asm:362    .text:000000000000022a l_ret_from_set
+     ./hashtable.asm:472    .text:00000000000002d6 f_setbit
+     ./hashtable.asm:368    .text:0000000000000230 f_table_clear
+     ./hashtable.asm:419    .text:000000000000028e ret_from_amount_elements
+     ./hashtable.asm:392    .text:000000000000025c l_word_check_loop
+     ./hashtable.asm:402    .text:000000000000026e l_bit_check_loop
+     ./hashtable.asm:459    .text:00000000000002c2 l_clear_loop
+     ./hashtable.asm:506    .text:000000000000032c l_not_zero
+     ./hashtable.asm:511    .text:0000000000000332 f_clear_bit
+     ./hashtable.asm:531    .text:0000000000000368 _dummy
+     ./hashtable.asm:539    .text:0000000000000372 $d
+     ./hashtable.asm:539    .text:0000000000000374 $d
 
 NO UNDEFINED SYMBOLS

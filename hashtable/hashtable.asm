@@ -3,7 +3,7 @@
     .syntax unified
 
 @equates
-    .equ    TABLE_SIZE,      200
+    .equ    TABLE_SIZE,      500
     .equ    TABLE_PTR,       0x20001500
     .equ    ARRAY_PTR,       0x20000000
     .equ    STACKINIT,       0x20005000
@@ -28,7 +28,26 @@ vectors:
 @ n * (4 + 4) Bytes
 @        :    Actual keys and values stored first four bytes are for key, next 4 bytes for element content
 
-
+@ Notes:
+@ Labels starting with l are labels that are not supposed to be jumped to as subroutines
+@ Labels starting with f are supposed to be interpreted as functions
+@ Purpose of _start label is measuring the amount of collisions when reading all values in the hashtable
+@     This is measured with different percentages of filled indices.
+@     Note that in order to get the actual amount of reads one has to add the amount of actual
+@     values in the hashtable on top of that number.
+@
+@ Contents of the hash table cannot be deleted yet. The hashtable cannot grow dynamically and
+@     cloning ( or copying to an array ) is not possible either.
+@
+@ For the initialization of the hashtable one can either specify the maximum amount of collisions 
+@   or by calling f_full_init_table the initialization is done with the highest value possible
+@   ( which is just m = n / 2, where n is the size of the table and m is the maximum amount ).
+@
+@ TODO:
+@ - Change data structure to support deletion of elements
+@ - implement delete function
+@ - implement to_array function
+@ - write tests for all functionality
 @ ------------------------------------------------------------------------------------------------------
 
 _start:
@@ -42,10 +61,27 @@ _start:
         LDR r8, =ARRAY_PTR
 
 
-        LDR r4, =100
+        LDR r4, =250
         BL f_test_suite
 
-        EOR r0, r0
+        EOR r5, r5
+        LDR r4, =450
+        BL f_test_suite
+
+        EOR r5, r5
+        LDR r4, =475
+        BL f_test_suite
+
+        EOR r5, r5
+        LDR r4, =500
+        BL f_test_suite
+
+        EOR r5, r5
+
+        BL f_table_amount_elements
+
+        EOR r4, r4
+
 
         @ the following is for debugging purposes
         @LDR r2, =100
@@ -65,19 +101,6 @@ _start:
         @BL f_table_get
 
 
-@ r0: size of table, r1: ptr to start of table, r2: key, r3: value
-@ return: r4: bool that indicates whether able to insert
-@f_table_set:
-
-@ r0: size of table, r1: ptr to start of table, r2: key
-@ return: r3: value, r4: bool that indicates whether found, r5: amount of collisions
-@f_table_get:
-
-
-@ r0: size of table, r1: ptr to start of table
-@ return: r5: amount of elements
-@f_table_amount_elements:
-
 
 
 @ r0: size of table, r1: pointer to table, r4: amount of elements, r8: array ptr
@@ -94,15 +117,17 @@ f_test_suite:
 l_element_fill_loop:
         MOV r3, r11
         BL f_randint
-        ADD r11, r3, #0x01
-        ROR r11, 3
-        MOV r2, r4
+        MOV r11, r4, ROR 13
         MOV r3, r5
+        MOV r2, r4
 
         BL f_table_set
 
         CMP r4, #0x00
+        ITT EQ
+        ADDEQ r11, #0x01
         BEQ l_element_fill_loop
+
         STR.W r2, [r9]
         ADD r9, #0x04
         SUB r5, #0x01
@@ -113,9 +138,13 @@ l_element_fill_loop:
 
         BL f_table_amount_elements
 
-        CMP r5, r4
+        CMP r5, r12
+        ITT CC
+        ADDCC r11, #0x01
         BCC l_element_fill_loop
 
+
+l_filled_hash_table:
         MOV r9, r8
         EOR r6, r6
         MOV r11, r4
@@ -124,9 +153,13 @@ l_element_get_loop:
         LDR r2, [r9]
         ADD r9, #0x04
         BL f_table_get
-        @ CBZ r4, l_error_occured
+        CBZ r4, l_error_occured
+
+        CMP r12, r3 @ test whether values are equal
+        BNE l_error_occured
 
         ADD r6, r5
+        ADD r11, #0x01
         SUB r12, #0x01
         CMP r12, #0x00
         BNE l_element_get_loop
@@ -137,8 +170,6 @@ l_element_get_loop:
         POP {r2, r3, r4, r6, r9, r10, r11, lr}
 
         BX lr
-
-
 
 
 l_error_occured:
@@ -236,6 +267,9 @@ l_no_mod:
 l_found_with_collisions:
         MOV r5, r12
 l_in_table:
+        CMP r12, #0x00
+        IT EQ
+        LDREQ r5, =#0x00
         ADD r9, #0x04
         LDR r3, [r9]
         LDR r4, =#0x01
@@ -350,7 +384,7 @@ f_table_clear:
 @ r0: size of table, r1: ptr to start of table
 @ return: r5: amount of elements
 f_table_amount_elements:
-        PUSH { r3, r4, r6, r7 }
+        PUSH { r3, r4, r6, r7, r8 }
         EOR r5, r5
 
         CMP r0, #0x00
@@ -362,25 +396,34 @@ f_table_amount_elements:
         ADD r3, #0x04
 
 l_word_check_loop:
+        CBZ r7, ret_from_amount_elements
         LDR r4, [r3]
         ADD r3, #0x04
+
+        LDR r8, =#0x20
+        CMP r7, #0x20
+        BCS l_bit_check_loop
+        MOV r8, r7
 
 l_bit_check_loop:
         ANDS r6, r4, #0x01
         LSR r4, 1
         ADD r5, r6
 
+        SUB r8, #0x01
         SUB r7, #0x01
         CBZ r7, ret_from_amount_elements
 
         CMP r4, #0x00
+        ITT EQ
+        SUBEQ r7, r8
         BEQ l_word_check_loop
 
         B l_bit_check_loop
 
 
 ret_from_amount_elements:
-        POP { r3, r4, r6, r7 }
+        POP { r3, r4, r6, r7, r8 }
         BX lr
 
 
